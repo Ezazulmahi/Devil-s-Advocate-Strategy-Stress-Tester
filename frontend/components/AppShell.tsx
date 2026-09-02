@@ -27,7 +27,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <Link href="/dashboard" className={isActive(pathname, "dashboard") ? "active" : ""}>
             Dashboard
           </Link>
-          <Link href="/dashboard" className={isActive(pathname, "projects") ? "active" : ""}>
+          <Link href="/projects" className={isActive(pathname, "projects") ? "active" : ""}>
             Projects
           </Link>
           <Link href="/settings" className={isActive(pathname, "settings") ? "active" : ""}>

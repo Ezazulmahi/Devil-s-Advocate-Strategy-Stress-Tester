@@ -15,13 +15,16 @@ export async function getProjectSummary(projectId: string) {
   const findings = FINDINGS.filter((f) => runIds.has(f.runId));
   const critical = findings.filter((f) => f.severity === "critical").length;
   const major = findings.filter((f) => f.severity === "major").length;
+  const minor = findings.filter((f) => f.severity === "minor").length;
   const allResolved = findings.length > 0 && findings.every((f) => f.status === "resolved");
+  const latestRun = [...runs].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).at(-1) ?? null;
   return {
     runCount: runs.length,
     findingCount: findings.length,
     criticalCount: critical,
     majorCount: major,
-    latestRun: runs[runs.length - 1] ?? null,
+    minorCount: minor,
+    latestRun,
     allResolved,
   };
 }
