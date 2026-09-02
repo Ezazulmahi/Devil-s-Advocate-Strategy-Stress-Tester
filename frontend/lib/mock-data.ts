@@ -407,17 +407,20 @@ export const FINDINGS: Finding[] = [
 export const DIALOGUE: DialogueTurn[] = [
   {
     id: "d1",
+    runId: "run-d2c-3",
     speaker: "persona",
     personaId: "investor",
     text: "Your CAC assumption of $12 seems optimistic for a new D2C skincare brand — most comparable launches in this category run $35–50. Where does $12 come from?",
   },
   {
     id: "d2",
+    runId: "run-d2c-3",
     speaker: "user",
     text: "That's based on our influencer partnership model, which has lower acquisition cost than paid ads.",
   },
   {
     id: "d3",
+    runId: "run-d2c-3",
     speaker: "persona",
     personaId: "investor",
     text: "Influencer-driven CAC still typically lands $20+ once you account for content production and management overhead — and you haven't shown a single case study proving your specific partnerships hit $12. This assumption is currently unsupported and materially affects your entire unit economics model.",

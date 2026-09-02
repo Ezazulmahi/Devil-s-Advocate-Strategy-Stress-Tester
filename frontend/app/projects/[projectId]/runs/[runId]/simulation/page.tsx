@@ -37,7 +37,12 @@ export default async function SimulationPage({
           {run.status === "running" ? "Pause" : "View results"}
         </Link>
       </div>
-      <SimulationView initialDialogue={dialogue} persona={persona} round="Round 2 of 3 — Escalation" />
+      <SimulationView
+        runId={run.id}
+        initialDialogue={dialogue}
+        persona={persona}
+        round={dialogue.length > 0 ? "Round 2 of 3 — Escalation" : "Round 1 — Opening"}
+      />
     </AppShell>
   );
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { DialogueTurn, Persona } from "@/models/types";
 
 interface SimulationViewProps {
+  runId: string;
   initialDialogue: DialogueTurn[];
   persona: Persona;
   round: string;
@@ -15,7 +16,7 @@ const ESCALATION_REPLIES = [
   "I'll grant that's a stronger answer than before. I'm downgrading the severity, but it's not resolved yet.",
 ];
 
-export default function SimulationView({ initialDialogue, persona, round }: SimulationViewProps) {
+export default function SimulationView({ runId, initialDialogue, persona, round }: SimulationViewProps) {
   const [dialogue, setDialogue] = useState(initialDialogue);
   const [draft, setDraft] = useState("");
 
@@ -24,6 +25,7 @@ export default function SimulationView({ initialDialogue, persona, round }: Simu
     if (!text) return;
     const userTurn: DialogueTurn = {
       id: `user-${Date.now()}`,
+      runId,
       speaker: "user",
       text,
     };
@@ -31,6 +33,7 @@ export default function SimulationView({ initialDialogue, persona, round }: Simu
       ESCALATION_REPLIES[Math.floor(Math.random() * ESCALATION_REPLIES.length)];
     const personaTurn: DialogueTurn = {
       id: `persona-${Date.now()}`,
+      runId,
       speaker: "persona",
       personaId: persona.id,
       text: reply,
@@ -48,6 +51,9 @@ export default function SimulationView({ initialDialogue, persona, round }: Simu
         </span>
       </div>
       <div className="dialogue">
+        {dialogue.length === 0 && (
+          <p className="subtext">No opening statement yet — defend your position to start the exchange.</p>
+        )}
         {dialogue.map((turn) => (
           <div key={turn.id} className={`dlg-msg ${turn.speaker}`}>
             <span className="who">{turn.speaker === "user" ? "You" : persona.name}</span>

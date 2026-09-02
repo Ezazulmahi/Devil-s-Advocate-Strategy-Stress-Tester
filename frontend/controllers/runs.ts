@@ -16,8 +16,8 @@ export async function getRunWithProject(runId: string) {
   return { run, project };
 }
 
-export async function getDialogue(_runId: string): Promise<DialogueTurn[]> {
-  return DIALOGUE;
+export async function getDialogue(runId: string): Promise<DialogueTurn[]> {
+  return DIALOGUE.filter((turn) => turn.runId === runId);
 }
 
 export async function startRun(

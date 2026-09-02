@@ -34,6 +34,7 @@ export interface StressTestRun {
 
 export interface DialogueTurn {
   id: string;
+  runId: string;
   speaker: "user" | "persona";
   personaId?: PersonaId;
   text: string;
