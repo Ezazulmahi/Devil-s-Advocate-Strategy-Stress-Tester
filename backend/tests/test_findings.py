@@ -89,6 +89,8 @@ def test_run_findings_lists_seeded_finding(client, db_session, auth_headers):
 
 
 def test_submit_rebuttal_success(client, db_session, auth_headers):
+    # Escalation runs synchronously (unlike run execution) and hits the real Groq
+    # API — this is the one CRUD test that isn't stubbed by stub_ai_execution.
     project = create_project(client, auth_headers)
     run = client.post(
         f"/projects/{project['id']}/run", json={"personas": ["hacker"]}, headers=auth_headers
@@ -103,7 +105,8 @@ def test_submit_rebuttal_success(client, db_session, auth_headers):
     assert resp.status_code == 201
     body = resp.json()
     assert body["user_response"] == "We rotated the secret and moved it to env vars."
-    assert body["persona_counter_response"] is None
+    assert isinstance(body["persona_counter_response"], str)
+    assert len(body["persona_counter_response"]) > 0
 
 
 def test_submit_rebuttal_rejects_empty_response(client, db_session, auth_headers):

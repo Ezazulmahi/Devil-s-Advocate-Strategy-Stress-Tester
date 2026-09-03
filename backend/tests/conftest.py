@@ -1,4 +1,5 @@
 import uuid
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -6,6 +7,21 @@ from sqlalchemy.orm import Session
 
 from database import engine, get_db
 from main import app
+
+
+@pytest.fixture(autouse=True)
+def stub_ai_execution(request):
+    """Prevent the default test suite from triggering real Groq/web-search calls.
+
+    execute_run runs as a FastAPI BackgroundTask, which the TestClient executes
+    synchronously with its own DB session — outside the test's rolled-back
+    transaction. Tests that need the real pipeline opt in via @pytest.mark.ai_integration.
+    """
+    if "ai_integration" in request.keywords:
+        yield
+        return
+    with patch("controllers.run_controller.execute_run"):
+        yield
 
 
 @pytest.fixture()
