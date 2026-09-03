@@ -52,8 +52,13 @@ def get_owned_run(db: Session, run_id: uuid.UUID, user: User) -> StressTestRun:
     return run
 
 
-def list_findings_for_run(db: Session, run: StressTestRun) -> list[Finding]:
-    return db.query(Finding).filter(Finding.run_id == run.id).order_by(Finding.created_at).all()
+def list_findings_for_run(
+    db: Session, run: StressTestRun, limit: int = 100, offset: int = 0
+) -> tuple[list[Finding], int]:
+    query = db.query(Finding).filter(Finding.run_id == run.id)
+    total = query.count()
+    items = query.order_by(Finding.created_at).limit(limit).offset(offset).all()
+    return items, total
 
 
 def execute_run(run_id: uuid.UUID) -> None:
