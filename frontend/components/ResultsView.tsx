@@ -2,15 +2,18 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { Finding, Persona } from "@/models/types";
+import type { Finding, Persona, Severity } from "@/models/types";
 
 interface ResultsViewProps {
   findings: Finding[];
   personas: Persona[];
 }
 
+const SEVERITIES: Severity[] = ["critical", "major", "minor"];
+
 export default function ResultsView({ findings, personas }: ResultsViewProps) {
-  const [filter, setFilter] = useState<string>("all");
+  const [personaFilter, setPersonaFilter] = useState<string>("all");
+  const [severityFilter, setSeverityFilter] = useState<string>("all");
 
   const counts = useMemo(
     () => ({
@@ -21,7 +24,11 @@ export default function ResultsView({ findings, personas }: ResultsViewProps) {
     [findings]
   );
 
-  const visible = filter === "all" ? findings : findings.filter((f) => f.personaId === filter);
+  const visible = findings.filter(
+    (f) =>
+      (personaFilter === "all" || f.persona === personaFilter) &&
+      (severityFilter === "all" || f.severity === severityFilter)
+  );
   const personaById = new Map(personas.map((p) => [p.id, p]));
 
   return (
@@ -41,33 +48,61 @@ export default function ResultsView({ findings, personas }: ResultsViewProps) {
         </div>
       </div>
       <div className="filter-row">
-        <button type="button" className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>
+        <button
+          type="button"
+          className={personaFilter === "all" ? "active" : ""}
+          onClick={() => setPersonaFilter("all")}
+        >
           All Personas
         </button>
         {personas.map((p) => (
           <button
             key={p.id}
             type="button"
-            className={filter === p.id ? "active" : ""}
-            onClick={() => setFilter(p.id)}
+            className={personaFilter === p.id ? "active" : ""}
+            onClick={() => setPersonaFilter(p.id)}
           >
             {p.name.split(" ")[0]}
           </button>
         ))}
       </div>
+      <div className="filter-row">
+        <button
+          type="button"
+          className={severityFilter === "all" ? "active" : ""}
+          onClick={() => setSeverityFilter("all")}
+        >
+          All Severities
+        </button>
+        {SEVERITIES.map((s) => (
+          <button
+            key={s}
+            type="button"
+            className={severityFilter === s ? "active" : ""}
+            onClick={() => setSeverityFilter(s)}
+          >
+            {s[0].toUpperCase() + s.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {visible.length === 0 && (
+        <p className="subtext">No findings match this filter.</p>
+      )}
+
       {visible.map((finding) => {
-        const persona = personaById.get(finding.personaId);
+        const persona = personaById.get(finding.persona);
         return (
           <Link key={finding.id} href={`/findings/${finding.id}`} className="case-file">
             <div className="case-file-head">
-              <span className="persona-src">Persona: {persona?.name ?? finding.personaId}</span>
+              <span className="persona-src">Persona: {persona?.name ?? finding.persona}</span>
               <span className={`stamp-badge stamp-${finding.severity}`}>
                 {finding.severity[0].toUpperCase() + finding.severity.slice(1)}
               </span>
             </div>
             <h4>{finding.title}</h4>
             <p>{finding.description}</p>
-            <div className="fix">Suggested fix: {finding.suggestedFix}</div>
+            <div className="fix">Suggested fix: {finding.suggested_fix}</div>
           </Link>
         );
       })}

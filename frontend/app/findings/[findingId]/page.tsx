@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import AppShell from "@/components/AppShell";
-import RebuttalThread from "@/components/RebuttalThread";
+import FindingDetailView from "@/components/FindingDetailView";
 import { getFindingContext, getRebuttals } from "@/controllers/findings";
 import { getPersona } from "@/controllers/personas";
 
@@ -14,34 +14,13 @@ export default async function FindingDetailPage({
   if (!context) notFound();
   const { finding } = context;
 
-  const persona = await getPersona(finding.personaId);
+  const persona = await getPersona(finding.persona);
   const rebuttals = await getRebuttals(finding.id);
-  const round = rebuttals.length + 1;
 
   return (
     <AppShell>
-      <div className="topbar">
-        <div>
-          <h1 style={{ fontSize: 18 }}>
-            Finding — {finding.title}
-          </h1>
-          <p className="subtext">
-            {persona?.name ?? finding.personaId} ·{" "}
-            {finding.severity[0].toUpperCase() + finding.severity.slice(1)} · Round {round}
-          </p>
-        </div>
-        <span className={`stamp-badge stamp-${finding.severity}`}>
-          {finding.severity[0].toUpperCase() + finding.severity.slice(1)}
-        </span>
-      </div>
-
-      <div className="finding-detail">
-        <h2>Original Finding</h2>
-        <p>{finding.description}</p>
-      </div>
-
-      <RebuttalThread
-        findingId={finding.id}
+      <FindingDetailView
+        initialFinding={finding}
         initialRebuttals={rebuttals}
         personaName={persona?.name ?? "Persona"}
       />

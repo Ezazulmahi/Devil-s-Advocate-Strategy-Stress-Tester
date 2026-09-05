@@ -1,5 +1,7 @@
 import AppShell from "@/components/AppShell";
 import { PERSONAS } from "@/lib/mock-data";
+import { serverFetch } from "@/lib/server-api";
+import type { User } from "@/models/types";
 
 function SectionCard({
   title,
@@ -19,7 +21,9 @@ function SectionCard({
   );
 }
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const user = await serverFetch<User>("/auth/me");
+
   return (
     <AppShell>
       <div className="topbar">
@@ -32,34 +36,23 @@ export default function SettingsPage() {
       <SectionCard title="Profile" description="Your identity across every stress test you run.">
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
           <div className="field" style={{ flex: 1, minWidth: 200 }}>
-            <label htmlFor="name">Name</label>
-            <input id="name" defaultValue="Md Tahmid Uddin" />
+            <label htmlFor="settings-email">Email</label>
+            <input id="settings-email" defaultValue={user.email} disabled />
           </div>
           <div className="field" style={{ flex: 1, minWidth: 200 }}>
-            <label htmlFor="settings-email">Email</label>
-            <input id="settings-email" defaultValue="tamimhasanakib@gmail.com" disabled />
+            <label htmlFor="settings-created">Member since</label>
+            <input id="settings-created" defaultValue={user.created_at.slice(0, 10)} disabled />
           </div>
         </div>
-        <button type="button" className="btn btn-red" style={{ marginTop: 4 }}>
-          Save changes
-        </button>
       </SectionCard>
 
       <SectionCard
         title="Default Personas"
-        description="Pre-selected personas whenever you start a new stress test — you can still change them per run."
+        description="Reference only for now — persona selection happens per stress test on the New Stress Test page."
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {PERSONAS.map((persona) => (
-            <label
-              key={persona.id}
-              style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}
-            >
-              <input
-                type="checkbox"
-                defaultChecked={persona.id !== "hacker" && persona.id !== "academic"}
-                style={{ width: 16, height: 16 }}
-              />
+            <div key={persona.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
               <span
                 className="p-icon"
                 style={{ background: persona.color, width: 24, height: 24, fontSize: 11, marginBottom: 0 }}
@@ -67,37 +60,33 @@ export default function SettingsPage() {
                 {persona.shortLabel}
               </span>
               {persona.name}
-            </label>
+            </div>
           ))}
         </div>
       </SectionCard>
 
       <SectionCard
         title="Notifications"
-        description="Get pinged when a live simulation finishes or a persona escalates on you."
+        description="In-app toasts already fire when a simulation completes or a persona responds to a rebuttal. Email delivery isn't built yet."
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, opacity: 0.5 }}>
           <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-            <input type="checkbox" defaultChecked style={{ width: 16, height: 16 }} />
-            Email me when a stress test run completes
+            <input type="checkbox" disabled style={{ width: 16, height: 16 }} />
+            Email me when a stress test run completes (not yet available)
           </label>
           <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-            <input type="checkbox" defaultChecked style={{ width: 16, height: 16 }} />
-            Email me when a persona escalates a finding to critical
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-            <input type="checkbox" style={{ width: 16, height: 16 }} />
-            Weekly digest of unresolved findings across all projects
+            <input type="checkbox" disabled style={{ width: 16, height: 16 }} />
+            Weekly digest of unresolved findings (not yet available)
           </label>
         </div>
       </SectionCard>
 
       <SectionCard
         title="Danger Zone"
-        description="Deleting your account removes every project, run, and finding permanently."
+        description="Account deletion isn't wired up yet — delete individual projects from the Dashboard or Projects page instead, which does permanently remove that project and its full run history."
       >
-        <button type="button" className="btn btn-ghost" style={{ borderColor: "var(--red)", color: "var(--red)" }}>
-          Delete account
+        <button type="button" className="btn btn-ghost" disabled style={{ opacity: 0.5 }}>
+          Delete account (not yet available)
         </button>
       </SectionCard>
     </AppShell>

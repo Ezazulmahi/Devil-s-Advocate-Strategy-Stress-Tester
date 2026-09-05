@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useRef, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { useToast } from "@/components/Toast";
 import { PERSONAS } from "@/lib/mock-data";
-import { createProject } from "@/controllers/projects";
-import { startRun } from "@/controllers/runs";
-import type { InputType, PersonaId } from "@/models/types";
+import { ApiError } from "@/lib/api-config";
+import { clientFetch } from "@/lib/client-api";
+import type { InputTypeDetectResponse, PersonaId, StressTestProject, StressTestRun } from "@/models/types";
 
 const INPUT_TABS: { id: "paste" | "upload" | "repo"; label: string }[] = [
   { id: "paste", label: "Paste Text" },
@@ -16,43 +17,89 @@ const INPUT_TABS: { id: "paste" | "upload" | "repo"; label: string }[] = [
 
 const DEFAULT_SELECTED: PersonaId[] = ["competitor", "investor", "customer"];
 
-function inferInputType(personaIds: PersonaId[]): InputType {
-  if (personaIds.includes("hacker")) return "codebase";
-  if (personaIds.includes("academic")) return "research_paper";
-  return "business_plan";
-}
-
 export default function NewStressTestPage() {
   const router = useRouter();
+  const { notify } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [activeTab, setActiveTab] = useState<(typeof INPUT_TABS)[number]["id"]>("paste");
   const [title, setTitle] = useState("");
   const [rawInput, setRawInput] = useState("");
+  const [repoUrl, setRepoUrl] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [selected, setSelected] = useState<PersonaId[]>(DEFAULT_SELECTED);
+  const [personasTouched, setPersonasTouched] = useState(false);
+  const [detected, setDetected] = useState<InputTypeDetectResponse | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  const placeholder = useMemo(() => {
-    if (activeTab === "upload") return "Drag a PDF into this area, or click to browse.";
-    if (activeTab === "repo") return "https://github.com/your-org/your-repo";
-    return "Paste your business plan, pitch, or code excerpt here — or drag a file into this area.";
-  }, [activeTab]);
+  const [error, setError] = useState<string | null>(null);
 
   function togglePersona(id: PersonaId) {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
-    );
+    setPersonasTouched(true);
+    setSelected((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
+  }
+
+  async function handleRawInputBlur() {
+    if (rawInput.trim().length < 20) return;
+    try {
+      const result = await clientFetch<InputTypeDetectResponse>("/projects/detect-input-type", {
+        method: "POST",
+        body: JSON.stringify({ raw_input: rawInput }),
+      });
+      setDetected(result);
+      if (!personasTouched) {
+        setSelected(result.suggested_personas);
+      }
+    } catch {
+      // Detection is a convenience, not a requirement — fail silently and let the user pick manually.
+    }
+  }
+
+  function canSubmit(): boolean {
+    if (selected.length === 0) return false;
+    if (!title.trim()) return false;
+    if (activeTab === "paste") return rawInput.trim().length > 0;
+    if (activeTab === "upload") return file !== null;
+    return repoUrl.trim().length > 0;
   }
 
   async function handleRun() {
-    if (selected.length === 0 || submitting) return;
+    if (!canSubmit() || submitting) return;
     setSubmitting(true);
-    await createProject({
-      title: title.trim() || "Untitled Stress Test",
-      inputType: inferInputType(selected),
-      rawInput,
-      personaIds: selected,
-    });
-    await startRun("d2c-skincare", selected);
-    router.push(`/projects/d2c-skincare/runs/run-d2c-3/simulation`);
+    setError(null);
+
+    try {
+      let project: StressTestProject;
+      if (activeTab === "paste") {
+        project = await clientFetch<StressTestProject>("/projects", {
+          method: "POST",
+          body: JSON.stringify({ title: title.trim(), raw_input: rawInput }),
+        });
+      } else if (activeTab === "upload") {
+        const form = new FormData();
+        form.append("title", title.trim());
+        form.append("file", file as File);
+        project = await clientFetch<StressTestProject>("/projects/upload", {
+          method: "POST",
+          body: form,
+        });
+      } else {
+        project = await clientFetch<StressTestProject>("/projects/from-repo", {
+          method: "POST",
+          body: JSON.stringify({ title: title.trim(), repo_url: repoUrl.trim() }),
+        });
+      }
+
+      const run = await clientFetch<StressTestRun>(`/projects/${project.id}/run`, {
+        method: "POST",
+        body: JSON.stringify({ personas: selected }),
+      });
+
+      router.push(`/projects/${project.id}/runs/${run.id}/simulation`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Something went wrong. Please try again.");
+      notify("Couldn't start the stress test — see the error above.", "error");
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -86,17 +133,59 @@ export default function NewStressTestPage() {
           </button>
         ))}
       </div>
+
       <div className="drop-zone">
-        {activeTab === "paste" ? (
+        {activeTab === "paste" && (
           <textarea
-            placeholder={placeholder}
+            placeholder="Paste your business plan, pitch, or code excerpt here."
             value={rawInput}
             onChange={(e) => setRawInput(e.target.value)}
+            onBlur={handleRawInputBlur}
           />
-        ) : (
-          <span>{placeholder}</span>
+        )}
+        {activeTab === "upload" && (
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              style={{ display: "none" }}
+            />
+            <button
+              type="button"
+              className="btn btn-dark"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {file ? file.name : "Choose a PDF file"}
+            </button>
+          </div>
+        )}
+        {activeTab === "repo" && (
+          <input
+            placeholder="https://github.com/your-org/your-repo"
+            value={repoUrl}
+            onChange={(e) => setRepoUrl(e.target.value)}
+            style={{
+              width: "100%",
+              background: "transparent",
+              border: "1px solid var(--border-light)",
+              borderRadius: 3,
+              padding: "10px 12px",
+              color: "var(--text-light)",
+              fontFamily: "var(--font-inter)",
+              fontSize: 13.5,
+            }}
+          />
         )}
       </div>
+
+      {detected && (
+        <p className="subtext" style={{ marginTop: -12, marginBottom: 20 }}>
+          Detected as <strong>{detected.input_type.replace("_", " ")}</strong> — suggested personas
+          preselected below, still yours to change.
+        </p>
+      )}
 
       <h3 className="stamp" style={{ fontSize: 14, marginBottom: 12, color: "#fff" }}>
         Select Personas
@@ -121,11 +210,14 @@ export default function NewStressTestPage() {
           );
         })}
       </div>
+
+      {error && <p style={{ color: "var(--red)", fontSize: 12.5, marginBottom: 14 }}>{error}</p>}
+
       <button
         type="button"
         className="btn btn-red"
         style={{ padding: "12px 28px" }}
-        disabled={selected.length === 0 || submitting}
+        disabled={!canSubmit() || submitting}
         onClick={handleRun}
       >
         {submitting ? "Starting…" : "Run Stress Test →"}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Special_Elite, Inter, IBM_Plex_Mono } from "next/font/google";
+import { ToastProvider } from "@/components/Toast";
 import "./globals.css";
 
 const specialElite = Special_Elite({
@@ -30,7 +31,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${specialElite.variable} ${inter.variable} ${plexMono.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        <ToastProvider>{children}</ToastProvider>
+      </body>
     </html>
   );
 }

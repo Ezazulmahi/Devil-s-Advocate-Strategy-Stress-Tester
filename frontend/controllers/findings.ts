@@ -1,36 +1,34 @@
-import { FINDINGS, REBUTTALS, RUNS, PROJECTS } from "@/lib/mock-data";
-import type { Finding, Rebuttal } from "@/models/types";
+import "server-only";
+
+import { serverFetch } from "@/lib/server-api";
+import type { Finding, Rebuttal, StressTestProject, StressTestRun } from "@/models/types";
+import { getProject } from "@/controllers/projects";
+import { getRun } from "@/controllers/runs";
 
 export async function getFindingsForRun(runId: string): Promise<Finding[]> {
-  return FINDINGS.filter((f) => f.runId === runId);
+  return serverFetch<Finding[]>(`/runs/${runId}/findings?limit=500`);
 }
 
 export async function getFinding(findingId: string): Promise<Finding | null> {
-  return FINDINGS.find((f) => f.id === findingId) ?? null;
+  try {
+    return await serverFetch<Finding>(`/findings/${findingId}`);
+  } catch {
+    return null;
+  }
 }
 
-export async function getFindingContext(findingId: string) {
+export async function getFindingContext(findingId: string): Promise<{
+  finding: Finding;
+  run: StressTestRun | null;
+  project: StressTestProject | null;
+} | null> {
   const finding = await getFinding(findingId);
   if (!finding) return null;
-  const run = RUNS.find((r) => r.id === finding.runId) ?? null;
-  const project = run ? PROJECTS.find((p) => p.id === run.projectId) ?? null : null;
+  const run = await getRun(finding.run_id);
+  const project = run ? await getProject(run.project_id) : null;
   return { finding, run, project };
 }
 
 export async function getRebuttals(findingId: string): Promise<Rebuttal[]> {
-  return REBUTTALS.filter((r) => r.findingId === findingId);
-}
-
-export async function submitRebuttal(
-  findingId: string,
-  userResponse: string
-): Promise<Rebuttal> {
-  return {
-    id: `rebuttal-${Date.now()}`,
-    findingId,
-    userResponse,
-    personaCounterResponse:
-      "That narrows the gap, but I'd want to see this hold up at 10x the current sample before treating it as validated.",
-    createdAt: new Date().toISOString().slice(0, 10),
-  };
+  return serverFetch<Rebuttal[]>(`/findings/${findingId}/rebuttals`);
 }

@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import AppShell from "@/components/AppShell";
-import SimulationView from "@/components/SimulationView";
-import { getRunWithProject, getDialogue } from "@/controllers/runs";
-import { getPersona } from "@/controllers/personas";
+import RunProgressView from "@/components/RunProgressView";
+import { getRunWithProject } from "@/controllers/runs";
 
 export default async function SimulationPage({
   params,
@@ -15,33 +14,22 @@ export default async function SimulationPage({
   if (!context || !context.project) notFound();
   const { run, project } = context;
 
-  const dialogue = await getDialogue(run.id);
-  const personaId =
-    dialogue.find((turn) => turn.personaId)?.personaId ??
-    run.personasUsed[0] ??
-    "investor";
-  const persona = await getPersona(personaId);
-  if (!persona) notFound();
-
   return (
     <AppShell>
       <div className="topbar">
         <div>
           <h1>{project.title}</h1>
-          <p className="subtext">
-            {run.status === "running" ? "Simulation in progress" : "Simulation replay"} ·{" "}
-            {persona.name} persona
-          </p>
+          <p className="subtext">Stress test in progress</p>
         </div>
         <Link href={`/projects/${project.id}/runs/${run.id}`} className="btn btn-ghost">
-          {run.status === "running" ? "Pause" : "View results"}
+          View results
         </Link>
       </div>
-      <SimulationView
+      <RunProgressView
+        projectId={project.id}
         runId={run.id}
-        initialDialogue={dialogue}
-        persona={persona}
-        round={dialogue.length > 0 ? "Round 2 of 3 — Escalation" : "Round 1 — Opening"}
+        personasUsed={run.personas_used}
+        initialStatus={run.status}
       />
     </AppShell>
   );

@@ -6,6 +6,9 @@ export type Severity = "critical" | "major" | "minor";
 
 export type RunStatus = "pending" | "running" | "completed" | "failed";
 
+export type FindingStatus = "open" | "resolved" | "downgraded";
+
+// Static UI metadata for the persona picker — not fetched from the API.
 export interface Persona {
   id: PersonaId;
   name: string;
@@ -14,71 +17,75 @@ export interface Persona {
   color: string;
 }
 
+// Everything below mirrors the FastAPI response shapes (snake_case) exactly,
+// so controllers/*.ts can pass API JSON straight through with no mapping layer.
+
+export interface User {
+  id: string;
+  email: string;
+  created_at: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
 export interface StressTestProject {
   id: string;
+  user_id: string;
   title: string;
-  inputType: InputType;
-  rawInputPreview: string;
-  createdAt: string;
+  input_type: InputType;
+  raw_input: string;
+  created_at: string;
 }
 
 export interface StressTestRun {
   id: string;
-  projectId: string;
-  runNumber: number;
-  personasUsed: PersonaId[];
+  project_id: string;
+  personas_used: PersonaId[];
   status: RunStatus;
-  createdAt: string;
-  completedAt: string | null;
-}
-
-export interface DialogueTurn {
-  id: string;
-  runId: string;
-  speaker: "user" | "persona";
-  personaId?: PersonaId;
-  text: string;
-}
-
-export interface PersonaFinding {
-  id: string;
-  runId: string;
-  personaId: PersonaId;
-  rawOutput: string;
+  created_at: string;
+  completed_at: string | null;
 }
 
 export interface Finding {
   id: string;
-  runId: string;
-  personaFindingId: string;
-  personaId: PersonaId;
+  run_id: string;
+  persona_finding_id: string;
+  persona: PersonaId;
   severity: Severity;
   category: string;
   title: string;
   description: string;
-  suggestedFix: string;
-  status: "open" | "resolved" | "downgraded";
+  suggested_fix: string;
+  status: FindingStatus;
+  created_at: string;
 }
 
 export interface Rebuttal {
   id: string;
-  findingId: string;
-  userResponse: string;
-  personaCounterResponse: string;
-  createdAt: string;
+  finding_id: string;
+  user_response: string;
+  persona_counter_response: string | null;
+  created_at: string;
 }
 
 export interface TimelineEntry {
-  id: string;
-  projectId: string;
-  runId: string;
-  runNumber: number;
-  date: string;
-  title: string;
-  summary: string;
-  resolvedCount: number;
-  criticalCount: number;
-  majorCount: number;
-  minorCount: number;
-  isResolvedMilestone: boolean;
+  run_id: string;
+  run_number: number;
+  status: RunStatus;
+  created_at: string;
+  completed_at: string | null;
+  critical_count: number;
+  major_count: number;
+  minor_count: number;
+  resolved_count: number;
+  downgraded_count: number;
+}
+
+export interface InputTypeDetectResponse {
+  input_type: InputType;
+  suggested_personas: PersonaId[];
 }
