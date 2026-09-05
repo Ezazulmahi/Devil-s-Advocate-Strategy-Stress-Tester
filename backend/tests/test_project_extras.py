@@ -269,6 +269,48 @@ def test_export_run_returns_pdf(client, db_session, auth_headers):
     assert len(resp.content) > 100
 
 
+def test_export_run_renders_non_latin_script(client, db_session, auth_headers):
+    import io
+
+    from pypdf import PdfReader
+
+    from models.finding import Finding
+    from models.persona_finding import PersonaFinding
+
+    project = create_project(client, auth_headers, title="বাংলা পিচ ডেক").json()
+    run = client.post(
+        f"/projects/{project['id']}/run", json={"personas": ["investor"]}, headers=auth_headers
+    ).json()
+    pf = PersonaFinding(run_id=uuid.UUID(run["id"]), persona="investor", raw_output="x")
+    db_session.add(pf)
+    db_session.flush()
+    db_session.add(
+        Finding(
+            run_id=uuid.UUID(run["id"]),
+            persona_finding_id=pf.id,
+            persona="investor",
+            severity="critical",
+            category="অর্থনীতি",
+            title="অবাস্তব দাবি",
+            description="এই দাবিটি বাস্তবসম্মত নয়।",
+            suggested_fix="প্রকৃত তথ্য দিয়ে যাচাই করুন।",
+        )
+    )
+    db_session.commit()
+
+    resp = client.get(f"/runs/{run['id']}/export", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.content[:4] == b"%PDF"
+
+    # A prior version fell back to latin-1 "replace", turning non-Latin text into
+    # literal "?" characters. PDF text is glyph-ID encoded inside compressed
+    # streams, not raw Unicode bytes, so the only real check is a round trip:
+    # extract the text back out and confirm the actual Bengali glyphs are there.
+    extracted = PdfReader(io.BytesIO(resp.content)).pages[0].extract_text()
+    assert "বাংলা" in extracted
+    assert "অবাস্তব দাবি" in extracted
+
+
 def test_export_run_owned_by_someone_else_is_404(client, auth_headers):
     project = create_project(client, auth_headers).json()
     run = client.post(

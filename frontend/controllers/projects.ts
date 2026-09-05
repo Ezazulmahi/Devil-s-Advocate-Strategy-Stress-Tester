@@ -1,16 +1,28 @@
 import "server-only";
 
-import { serverFetch } from "@/lib/server-api";
+import { unstable_rethrow } from "next/navigation";
+import { serverFetch, serverFetchPage } from "@/lib/server-api";
 import type { StressTestProject, StressTestRun, TimelineEntry } from "@/models/types";
+
+export const PROJECTS_PAGE_SIZE = 20;
 
 export async function getProjects(): Promise<StressTestProject[]> {
   return serverFetch<StressTestProject[]>("/projects?limit=200");
 }
 
+export async function getProjectsPage(
+  offset: number
+): Promise<{ items: StressTestProject[]; total: number }> {
+  return serverFetchPage<StressTestProject>(
+    `/projects?limit=${PROJECTS_PAGE_SIZE}&offset=${offset}`
+  );
+}
+
 export async function getProject(projectId: string): Promise<StressTestProject | null> {
   try {
     return await serverFetch<StressTestProject>(`/projects/${projectId}`);
-  } catch {
+  } catch (err) {
+    unstable_rethrow(err);
     return null;
   }
 }

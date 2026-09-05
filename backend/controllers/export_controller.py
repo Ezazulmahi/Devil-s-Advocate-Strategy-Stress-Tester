@@ -1,8 +1,15 @@
+import re
+from pathlib import Path
+
 from fpdf import FPDF
 
 from models.finding import Finding
 from models.project import StressTestProject
 from models.run import StressTestRun
+
+_FONT_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
+_FONT_LATIN = "NotoSans"
+_FONT_BENGALI = "NotoSansBengali"
 
 _SEVERITY_COLORS = {
     "critical": (196, 55, 43),
@@ -10,30 +17,62 @@ _SEVERITY_COLORS = {
     "minor": (107, 114, 128),
 }
 
+# Matches runs of Bengali script so they can be rendered with NotoSansBengali —
+# NotoSans (Latin/Greek/Cyrillic) doesn't cover it, and no single bundled font
+# covers both scripts well.
+_BENGALI_RUN = re.compile(r"[ঀ-৿]+")
 
-def _clean(text: str) -> str:
-    # FPDF's built-in fonts are latin-1 only; degrade unsupported characters rather than crash.
-    return text.encode("latin-1", "replace").decode("latin-1")
+
+def _register_fonts(pdf: FPDF) -> None:
+    # Noto Sans ships as a variable font; fpdf2 renders its default (Regular)
+    # instance regardless of requested weight, so bold/italic map to the same
+    # file — text stays fully Unicode-capable, just without a true bold face.
+    for style in ("", "B", "I", "BI"):
+        pdf.add_font(_FONT_LATIN, style, str(_FONT_DIR / "NotoSans-Regular.ttf"))
+        pdf.add_font(_FONT_BENGALI, style, str(_FONT_DIR / "NotoSansBengali-Regular.ttf"))
+
+
+def _split_script_runs(text: str) -> list[tuple[str, bool]]:
+    """Splits text into (segment, is_bengali) runs so each can use the font that covers it."""
+    runs: list[tuple[str, bool]] = []
+    pos = 0
+    for match in _BENGALI_RUN.finditer(text):
+        if match.start() > pos:
+            runs.append((text[pos : match.start()], False))
+        runs.append((match.group(), True))
+        pos = match.end()
+    if pos < len(text):
+        runs.append((text[pos:], False))
+    return runs or [("", False)]
+
+
+def _write_line(pdf: FPDF, text: str, size: float, style: str = "", height: float = 6) -> None:
+    """Writes one wrapped, line-broken paragraph, switching fonts per script run.
+
+    Characters unsupported by either bundled font (e.g. emoji) are dropped by
+    fpdf2 with a logged warning rather than corrupting the rest of the line —
+    graceful degradation instead of the old latin-1 mojibake fallback.
+    """
+    for segment, is_bengali in _split_script_runs(text):
+        if not segment:
+            continue
+        pdf.set_font(_FONT_BENGALI if is_bengali else _FONT_LATIN, style, size)
+        pdf.write(height, segment)
+    pdf.ln(height)
 
 
 def build_run_report_pdf(project: StressTestProject, run: StressTestRun, findings: list[Finding]) -> bytes:
     pdf = FPDF()
+    _register_fonts(pdf)
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
 
-    pdf.set_font("Helvetica", "B", 18)
-    pdf.cell(0, 10, _clean("Devil's Advocate — Stress Test Report"), new_x="LMARGIN", new_y="NEXT")
+    _write_line(pdf, "Devil's Advocate — Stress Test Report", 18, "B", height=10)
 
-    pdf.set_font("Helvetica", "", 12)
-    pdf.cell(0, 8, _clean(project.title), new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("Helvetica", "", 10)
+    _write_line(pdf, project.title, 12, height=8)
     pdf.set_text_color(100, 100, 100)
-    pdf.cell(
-        0,
-        6,
-        _clean(f"Run status: {run.status.value} | Personas: {', '.join(run.personas_used)}"),
-        new_x="LMARGIN",
-        new_y="NEXT",
+    _write_line(
+        pdf, f"Run status: {run.status.value} | Personas: {', '.join(run.personas_used)}", 10, height=6
     )
     pdf.ln(4)
     pdf.set_text_color(0, 0, 0)
@@ -42,13 +81,12 @@ def build_run_report_pdf(project: StressTestProject, run: StressTestRun, finding
     for f in findings:
         counts[f.severity.value] += 1
 
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(
-        0,
-        8,
-        _clean(f"{counts['critical']} critical | {counts['major']} major | {counts['minor']} minor"),
-        new_x="LMARGIN",
-        new_y="NEXT",
+    _write_line(
+        pdf,
+        f"{counts['critical']} critical | {counts['major']} major | {counts['minor']} minor",
+        12,
+        "B",
+        height=8,
     )
     pdf.ln(4)
 
@@ -56,28 +94,20 @@ def build_run_report_pdf(project: StressTestProject, run: StressTestRun, finding
 
     for finding in sorted_findings:
         color = _SEVERITY_COLORS[finding.severity.value]
-        pdf.set_font("Helvetica", "B", 12)
         pdf.set_text_color(*color)
-        pdf.multi_cell(0, 7, _clean(f"[{finding.severity.value.upper()}] {finding.title}"))
+        _write_line(pdf, f"[{finding.severity.value.upper()}] {finding.title}", 12, "B", height=7)
         pdf.set_text_color(0, 0, 0)
 
-        pdf.set_font("Helvetica", "I", 9)
-        pdf.cell(
-            0, 5, _clean(f"Persona: {finding.persona.value} | Category: {finding.category}"), new_x="LMARGIN", new_y="NEXT"
-        )
+        _write_line(pdf, f"Persona: {finding.persona.value} | Category: {finding.category}", 9, "I", height=5)
 
-        pdf.set_font("Helvetica", "", 10)
-        pdf.multi_cell(0, 5, _clean(finding.description))
+        _write_line(pdf, finding.description, 10, height=5)
         pdf.ln(1)
 
-        pdf.set_font("Helvetica", "B", 10)
-        pdf.cell(0, 5, _clean("Suggested fix:"), new_x="LMARGIN", new_y="NEXT")
-        pdf.set_font("Helvetica", "", 10)
-        pdf.multi_cell(0, 5, _clean(finding.suggested_fix))
+        _write_line(pdf, "Suggested fix:", 10, "B", height=5)
+        _write_line(pdf, finding.suggested_fix, 10, height=5)
         pdf.ln(5)
 
     if not findings:
-        pdf.set_font("Helvetica", "I", 11)
-        pdf.cell(0, 8, _clean("No findings for this run."), new_x="LMARGIN", new_y="NEXT")
+        _write_line(pdf, "No findings for this run.", 11, "I", height=8)
 
     return bytes(pdf.output())

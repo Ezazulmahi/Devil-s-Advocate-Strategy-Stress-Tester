@@ -1,5 +1,6 @@
 import "server-only";
 
+import { unstable_rethrow } from "next/navigation";
 import { serverFetch } from "@/lib/server-api";
 import type { Finding, Rebuttal, StressTestProject, StressTestRun } from "@/models/types";
 import { getProject } from "@/controllers/projects";
@@ -12,7 +13,8 @@ export async function getFindingsForRun(runId: string): Promise<Finding[]> {
 export async function getFinding(findingId: string): Promise<Finding | null> {
   try {
     return await serverFetch<Finding>(`/findings/${findingId}`);
-  } catch {
+  } catch (err) {
+    unstable_rethrow(err);
     return null;
   }
 }
