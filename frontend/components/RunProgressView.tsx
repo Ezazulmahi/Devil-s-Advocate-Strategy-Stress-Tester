@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/Toast";
-import { clientFetch } from "@/lib/client-api";
+import { ApiError } from "@/lib/api-config";
+import { clearClientToken, clientFetch } from "@/lib/client-api";
 import type { PersonaId, RunStatus, StressTestRun } from "@/models/types";
 
 const PERSONA_LABELS: Record<PersonaId, string> = {
@@ -46,13 +47,19 @@ export default function RunProgressView({
       try {
         const run = await clientFetch<StressTestRun>(`/runs/${runId}`);
         setStatus(run.status);
-      } catch {
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          clearClientToken();
+          notify("Your session expired — sign in to see this run's results.", "error");
+          router.push(`/?from=/projects/${projectId}/runs/${runId}`);
+          return;
+        }
         // transient network hiccup — keep polling
       }
     }, 2500);
 
     return () => clearInterval(interval);
-  }, [runId, status]);
+  }, [runId, status, projectId, router, notify]);
 
   useEffect(() => {
     if (notified.current) return;
